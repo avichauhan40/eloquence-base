@@ -10,6 +10,7 @@ use Sofa\Eloquence\Contracts\Relations\JoinerFactory;
 use Sofa\Eloquence\Contracts\Searchable\ParserFactory;
 use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Sofa\Eloquence\Searchable\Subquery as SearchableSubquery;
+use Carbon\Carbon;
 
 /**
  * @method $this leftJoin($table, $one, $operator, $two)
@@ -87,6 +88,25 @@ class Builder extends HookableBuilder
         return $this;
     }
 
+    /**
+     * Filter the Query by Date Range on "Current Table" only
+     * @param  string $date_range (Format: `START_DATE - END_DATE`, where joiner '-' is very Important)
+     * @param  string $column
+     * @return $this
+     */
+    public function filterDate($date_range, $column = 'created_at')
+    {
+        if ($date_range) {
+            $dates = explode('-', $date_range);
+            $start_date = Carbon::parse(trim($dates[0]))->startOfDay();
+            $end_date = Carbon::parse(trim($dates[1]))->endOfDay();
+            $this->query->where([
+                [$this->model->getTable() . '.' . $column, '>=', $start_date],
+                [$this->model->getTable() . '.' . $column, '<=', $end_date]
+            ]);
+        }
+        return $this;
+    }
     /**
      * Build the search subquery.
      *
@@ -444,13 +464,14 @@ class Builder extends HookableBuilder
         // appropriately and build a searchable column collection, which we will
         // use to build select and where clauses with correct table prefixes.
         foreach ($mappings as $mapping => $weight) {
+
             if (strpos($mapping, '.') !== false) {
                 list($relation, $column) = $this->model->parseMappedColumn($mapping);
 
                 $related = $joiner->leftJoin($relation);
 
                 $columns->add(
-                    new Column($grammar, $related->getTable(), $column, $mapping, $weight)
+                    new Column($grammar, $related->getTable(), $column, $mapping, $weight, $related->getConnection()->getDatabaseName())
                 );
             } else {
                 $columns->add(

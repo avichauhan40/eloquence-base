@@ -10,6 +10,7 @@ use Sofa\Eloquence\Contracts\Relations\JoinerFactory;
 use Sofa\Eloquence\Contracts\Searchable\ParserFactory;
 use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Sofa\Eloquence\Searchable\Subquery as SearchableSubquery;
+use Carbon\Carbon;
 
 /**
  * @method $this leftJoin($table, $one, $operator, $two)
@@ -88,6 +89,26 @@ class Builder extends HookableBuilder
     }
 
     /**
+     * Filter the Query by Date Range on "Current Table" only
+     * @param  string $date_range (Format: `START_DATE - END_DATE`, where joiner '-' is very Important)
+     * @param  string $column
+     * @return $this
+     */
+    public function filterDate($date_range, $column = 'created_at')
+    {
+        if ($date_range) {
+            $dates = explode('-', $date_range);
+            $start_date = Carbon::parse(trim($dates[0]))->startOfDay();
+            $end_date = Carbon::parse(trim($dates[1]))->endOfDay();
+            $this->query->where([
+                [$this->model->getTable() . '.' . $column, '>=', $start_date],
+                [$this->model->getTable() . '.' . $column, '<=', $end_date]
+            ]);
+        }
+        return $this;
+    }
+
+    /**
      * Build the search subquery.
      *
      * @param  array $words
@@ -102,12 +123,12 @@ class Builder extends HookableBuilder
         $columns = $this->joinForSearch($mappings, $subquery);
 
         $threshold = (is_null($threshold))
-                        ? array_sum($columns->getWeights()) / 4
-                        : (float) $threshold;
+            ? array_sum($columns->getWeights()) / 4
+            : (float) $threshold;
 
         $subquery->select($this->model->getTable() . '.*')
-                 ->from($this->model->getTable())
-                 ->groupBy($this->model->getQualifiedKeyName());
+            ->from($this->model->getTable())
+            ->groupBy($this->model->getQualifiedKeyName());
 
         $this->addSearchClauses($subquery, $columns, $words, $threshold);
 
@@ -145,7 +166,7 @@ class Builder extends HookableBuilder
             $this->searchWhere($subquery, $columns, $words, $whereBindings);
         }
 
-        $this->query->where('relevance', '>=', new Expression($threshold));
+        $this->query->where('relevance', '>=', new Expression(number_format($threshold, 2)));
 
         $this->query->orders = array_merge(
             [['column' => 'relevance', 'direction' => 'desc']],
@@ -250,9 +271,9 @@ class Builder extends HookableBuilder
 
                 $this->query->addBinding($bindings, 'select');
 
-            // if where is not to be moved onto the subquery, let's increment
-            // binding key appropriately, so we can reliably move binding
-            // for the next where clauses in the loop that is running.
+                // if where is not to be moved onto the subquery, let's increment
+                // binding key appropriately, so we can reliably move binding
+                // for the next where clauses in the loop that is running.
             } else {
                 $bindingKey += $bindingsCount;
             }
@@ -297,8 +318,8 @@ class Builder extends HookableBuilder
     protected function isHasWhere($where, $type)
     {
         return $type === 'basic'
-                && $where['column'] instanceof Expression
-                && $where['value'] instanceof Expression;
+            && $where['column'] instanceof Expression
+            && $where['value'] instanceof Expression;
     }
 
     /**
@@ -393,7 +414,7 @@ class Builder extends HookableBuilder
      */
     protected function isLeftMatching($word)
     {
-        return ends_with($word, '*');
+        return \Str::endsWith($word, '*');
     }
 
     /**
@@ -404,7 +425,7 @@ class Builder extends HookableBuilder
      */
     protected function isWildcard($word)
     {
-        return ends_with($word, '*') && starts_with($word, '*');
+        return \Str::endsWith($word, '*') && \Str::startsWith($word, '*');
     }
 
     /**

@@ -99,9 +99,9 @@ class Builder extends \Illuminate\Database\Query\Builder
         $bindings = $this->from instanceof Subquery ? ['order'] : ['select', 'order'];
 
         return $this->cloneWithout(['columns', 'orders', 'limit', 'offset'])
-                    ->cloneWithoutBindings($bindings)
-                    ->setAggregate('count', $this->withoutSelectAliases($columns))
-                    ->get()->all();
+            ->cloneWithoutBindings($bindings)
+            ->setAggregate('count', $this->withoutSelectAliases($columns))
+            ->get()->all();
     }
 
     /**

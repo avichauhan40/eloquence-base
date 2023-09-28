@@ -147,8 +147,8 @@ trait Eloquence
             $instance = new static;
 
             static::$columnListing = $instance->getConnection()
-                                        ->getSchemaBuilder()
-                                        ->getColumnListing($instance->getTable());
+                ->getSchemaBuilder()
+                ->getColumnListing($instance->getTable());
         }
     }
 

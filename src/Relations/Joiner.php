@@ -5,10 +5,13 @@ namespace Sofa\Eloquence\Relations;
 use LogicException;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Query\JoinClause as Join;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Database\Eloquent\Relations\MorphByMany;
 use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
@@ -95,7 +98,6 @@ class Joiner implements JoinerContract
     {
         $relation = $parent->{$segment}();
         $related  = $relation->getRelated();
-        $table    = $related->getTable();
 
         /* While joining add database name */
         $table = $related->getConnection()->getDatabaseName() . '.' . $related->getTable();
@@ -137,8 +139,14 @@ class Joiner implements JoinerContract
 
         $join = (new Join($this->query, $type, $table))->on($fk, '=', $pk);
 
+        if (in_array(SoftDeletes::class, class_uses_recursive($relation->getRelated()))) {
+            $join->whereNull($relation->getRelated()->getQualifiedDeletedAtColumn());
+        }
+
         if ($relation instanceof MorphOneOrMany) {
             $join->where($relation->getQualifiedMorphType(), '=', $parent->getMorphClass());
+        } elseif ($relation instanceof MorphToMany || $relation instanceof MorphByMany) {
+            $join->where($relation->getMorphType(), '=', $parent->getMorphClass());
         }
 
         return $join;
@@ -188,7 +196,7 @@ class Joiner implements JoinerContract
         }
 
         if ($relation instanceof BelongsTo) {
-            return [$relation->getQualifiedForeignKey(), $relation->getQualifiedOwnerKeyName()];
+            return [$relation->getQualifiedForeignKeyName(), $relation->getQualifiedOwnerKeyName()];
         }
 
         if ($relation instanceof BelongsToMany) {
@@ -198,7 +206,7 @@ class Joiner implements JoinerContract
         if ($relation instanceof HasManyThrough) {
             $fk = $relation->getQualifiedFarKeyName();
 
-            return [$fk, $relation->getParent()->getQualifiedKeyName()];
+            return [$fk, $relation->getQualifiedParentKeyName()];
         }
     }
 }
